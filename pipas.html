@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kuis Interaktif: Pengetahuan Umum</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutral with Teal Accent -->
+    <!-- Application Structure Plan: The application is structured as an interactive quiz. User flow: 1. Welcome Screen: User starts the combined quiz. 2. Quiz Screen: Displays one multiple-choice question at a time, provides immediate feedback, and shows a progress bar. 3. Results Screen: After the quiz, a summary screen shows the score with a doughnut chart. This structure is chosen for engaging, focused learning. The categories are now merged for a broader test of knowledge. -->
+    <!-- Visualization & Content Choices: Report Info: Static Q&A list (now combined). -> Goal: Create a unified interactive self-assessment tool. -> Viz/Presentation Method: One-question-at-a-time multiple-choice quiz using interactive buttons. Results via Chart.js doughnut chart. -> Interaction: Users click buttons. Immediate feedback. -> Justification: Interactive format with feedback is effective. Combined quiz offers a comprehensive challenge. -> Library/Method: Vanilla JS, Tailwind CSS, Chart.js. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .quiz-card {
+            transition: all 0.3s ease-in-out;
+            transform-style: preserve-3d;
+        }
+        .option-btn.correct { background-color: #10B981 !important; border-color: #059669 !important; color: white !important; }
+        .option-btn.incorrect { background-color: #EF4444 !important; border-color: #DC2626 !important; color: white !important; }
+        .feedback-correct { color: #10B981; }
+        .feedback-incorrect { color: #EF4444; }
+    </style>
+</head>
+<body class="bg-amber-50 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl mx-auto">
+        
+        <div id="welcome-screen" class="bg-white p-8 rounded-xl shadow-lg text-center">
+            <h1 class="text-3xl font-bold text-teal-800 mb-4">Selamat Datang di Kuis Interaktif</h1>
+            <p class="text-gray-600 mb-8">Uji pengetahuan umum Anda dalam berbagai bidang! Aplikasi ini menyajikan 40 soal pilihan ganda untuk mengasah pemahaman Anda. Klik tombol di bawah untuk memulai.</p>
+            <div class="flex justify-center">
+                <button id="start-quiz-btn" class="bg-teal-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-teal-700 transition-colors duration-300 w-full sm:w-auto">Mulai Kuis (40 Soal)</button>
+            </div>
+        </div>
+
+        <div id="quiz-screen" class="hidden bg-white p-6 sm:p-8 rounded-xl shadow-lg">
+            <div id="quiz-header" class="mb-6">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 id="quiz-category-title" class="text-2xl font-bold text-teal-800">Kuis Pengetahuan Umum</h2>
+                    <span id="question-counter" class="text-sm font-semibold text-gray-500"></span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-teal-500 h-2.5 rounded-full transition-all duration-500"></div>
+                </div>
+            </div>
+            
+            <div id="question-container" class="mb-6">
+                <p id="question-text" class="text-lg text-gray-700 leading-relaxed"></p>
+            </div>
+            
+            <div id="answer-options" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+
+            <div id="feedback-container" class="mt-6 min-h-[5rem]">
+                <p id="feedback-text" class="text-base font-semibold text-center"></p>
+                <p id="correct-answer-text" class="text-sm text-center text-gray-600 mt-2"></p>
+            </div>
+
+            <div class="mt-4 flex justify-end">
+                <button id="next-question-btn" class="hidden bg-teal-600 text-white font-bold py-2 px-8 rounded-lg hover:bg-teal-700 transition-colors duration-300">Selanjutnya</button>
+            </div>
+        </div>
+
+        <div id="results-screen" class="hidden bg-white p-8 rounded-xl shadow-lg text-center">
+             <h2 class="text-3xl font-bold text-teal-800 mb-4">Hasil Kuis</h2>
+            <p id="score-text" class="text-xl text-gray-700 mb-6"></p>
+            <div class="chart-container relative h-64 w-full max-w-xs mx-auto mb-6">
+                <canvas id="results-chart"></canvas>
+            </div>
+            <div class="flex justify-center">
+                <button id="restart-quiz-btn" class="bg-teal-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-teal-700 transition-colors duration-300 w-full sm:w-auto">Ulangi Kuis</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const allQuestions = [
+            // Fisika & Astronomi (30 soal)
+            { question: "Air terjun setinggi 25 m memiliki debit 48 m³/detik. Jika percepatan gravitasi 10 m/s² dan massa jenis air 1.000 kg/m³, daya yang dihasilkan adalah...", options: ["1.200 kilowatt", "12.000 kilowatt", "120.000 watt", "1.200.000 watt"], answer: "12.000 kilowatt" },
+            { question: "Sebuah balok kayu 5 Kg dipindahkan dari tinggi 50 cm ke 2,5 m. Jika g=10 m/s², besar usaha yang dilakukan adalah...", options: ["50 J", "100 J", "125 J", "150 J"], answer: "100 J" },
+            { question: "Sebuah benda jatuh bebas dari ketinggian h. Pada suatu saat, energi kinetiknya dua kali energi potensialnya. Tinggi benda pada saat itu adalah...", options: ["h/2", "h/3", "2h/3", "h/4"], answer: "h/3" },
+            { question: "Alat tulis 100 gram ditaruh di atas lemari setinggi 240 cm. Besar energi potensialnya adalah... (g=10m/s²).", options: ["0,24 J", "2,4 J", "24 J", "240 J"], answer: "2,4 J" },
+            { question: "Kanguru 45 Kg melompat dengan kecepatan awal 6 m/s pada sudut 45°. Energi potensial saat mencapai ketinggian maksimal adalah... (g=10 m/s²).", options: ["81 J", "202,5 J", "405 J", "810 J"], answer: "405 J" },
+            { question: "Partikel 1 kg lepas dari meja dengan kecepatan 2 m/s. Energi mekanik partikel pada ketinggian 1 m dari tanah adalah... (g=10 m/s²). (Asumsikan bibir meja adalah titik awal energi mekanik dihitung dan ketinggian bibir meja > 1m)", options: ["2 J", "10 J", "12 J", "22 J"], answer: "12 J" },
+            { question: "Hukum kekekalan energi mekanik tidak berlaku jika benda...", options: ["Bergerak lurus beraturan", "Berada dalam sistem tertutup", "Hanya dipengaruhi gaya gravitasi", "Berada dalam sistem yang terbuka atau ada gaya gesek"], answer: "Berada dalam sistem yang terbuka atau ada gaya gesek" },
+            { question: "Mesin cuci 400 watt telah menggunakan energi 8 KJ. Mesin cuci telah menyala selama...", options: ["2 detik", "20 detik", "200 detik", "0,05 detik"], answer: "20 detik" },
+            { question: "Anak 45 kg jatuh dari ketinggian 4 m ke atas pegas (k=10.000 N/m) yang panjang awalnya 1 m dari tanah. Panjang akhir pegas (diukur dari tanah) setelah pemampatan maksimum adalah sekitar...", options: ["0,153 m", "0,353 m", "0,647 m", "0,853 m"], answer: "0,353 m" },
+            { question: "Balok 3 kg bergerak pada bidang miring 60° dengan energi kinetik awal 18 J. Jika koefisien gesek 0,3, jarak terjauh yang dicapai balok saat meluncur ke atas adalah sekitar...", options: ["0,29 m", "0,59 m", "0,89 m", "1,19 m"], answer: "0,59 m" },
+            { question: "Manakah pernyataan yang benar mengenai usaha? 1. Dihitung dengan mengalikan gaya dengan perpindahan yang searah gaya. 2. Diukur dalam Joule. 3. Mengakibatkan perubahan energi.", options: ["1 saja", "1 dan 2", "2 dan 3", "1, 2, dan 3"], answer: "1, 2, dan 3" },
+            { question: "Sumber energi yang terdiri atas campuran propana dan butana dan digunakan sebagai bahan bakar untuk keperluan rumah tangga adalah...", options: ["LNG", "CNG", "LPG", "Avtur"], answer: "LPG" },
+            { question: "Sel surya adalah perangkat yang mengubah energi matahari menjadi energi listrik. Komponen utama dalam sel surya adalah...", options: ["Isolator", "Konduktor", "Semikonduktor", "Superkonduktor"], answer: "Semikonduktor" },
+            { question: "Suatu wilayah Indonesia memiliki banyak sungai yang beraliran deras. Keadaan tersebut mendukung untuk dikembangkan pembangkit listrik karena...", options: ["Air sungai dapat langsung menghasilkan listrik", "Energi potensial air sungai dapat diubah menjadi listrik", "Energi kinetik air sungai dapat dimanfaatkan untuk memutar turbin generator", "Sungai deras menghasilkan panas untuk generator"], answer: "Energi kinetik air sungai dapat dimanfaatkan untuk memutar turbin generator" },
+            { question: "Bahan bakar fosil masih menjadi tulang punggung energi. Kita harus mencari sumber energi alternatif karena bahan bakar fosil memiliki banyak kelemahan, KECUALI...", options: ["Menghasilkan emisi gas rumah kaca tinggi", "Sumbernya terbatas dan tidak terbarukan", "Membutuhkan biaya operasional dan perawatan yang tinggi", "Memiliki efisiensi energi yang sangat rendah"], answer: "Menghasilkan emisi gas rumah kaca tinggi" },
+            { question: "Benda langit yang memiliki sifat dapat memancarkan cahaya sendiri disebut dengan...", options: ["Planet", "Komet", "Bintang", "Asteroid"], answer: "Bintang" },
+            { question: "Benda langit yang bercahaya dan berbentuk memanjang menyerupai ekor adalah...", options: ["Meteor", "Komet", "Satelit", "Nebula"], answer: "Komet" },
+            { question: "Bentuk bumi tidak bulat sempurna seperti bola, melainkan pepat di kutub dan menggelembung di khatulistiwa. Hal ini terutama disebabkan oleh...", options: ["Revolusi bumi", "Rotasi bumi", "Gravitasi bulan", "Medan magnet bumi"], answer: "Rotasi bumi" },
+            { question: "Satu tahun pada kalender masehi (365 atau 366 hari) didasarkan pada perhitungan waktu yang dibutuhkan bumi untuk...", options: ["Berotasi penuh pada sumbunya", "Bulan mengelilingi Bumi", "Bumi mengelilingi Matahari (revolusi)", "Matahari mengelilingi pusat galaksi"], answer: "Bumi mengelilingi Matahari (revolusi)" },
+            { question: "Permukaan bulan yang selalu menghadap bumi selalu sama. Hal tersebut disebabkan karena...", options: ["Bulan tidak berotasi", "Periode rotasi Bulan sama dengan periode revolusinya mengelilingi Bumi", "Gravitasi Bumi menghentikan rotasi Bulan", "Bulan tidak memiliki atmosfer"], answer: "Periode rotasi Bulan sama dengan periode revolusinya mengelilingi Bumi" },
+            { question: "Lapisan atmosfer matahari bagian bawah yang berwarna kemerah-merahan, terlihat saat gerhana matahari total, berupa cincin cahaya dan tonjolan merah disebut...", options: ["Fotosfer", "Kromosfer", "Korona", "Inti Matahari"], answer: "Kromosfer" },
+            { question: "Granula pada fotosfer Matahari, yang tampak seperti bintik-bintik panas, terjadi akibat aktivitas matahari yang menimbulkan...", options: ["Badai matahari", "Letusan prominensa", "Aliran konveksi gas panas dari interior Matahari ke permukaannya", "Medan magnet yang sangat kuat"], answer: "Aliran konveksi gas panas dari interior Matahari ke permukaannya" },
+            { question: "Seorang nahkoda yang sedang berlayar di tengah samudra lepas tiba-tiba mendapatkan berita ada gempa besar dengan potensi tsunami. Langkah mitigasi yang seharusnya dilakukan nahkoda kapal adalah...", options: ["Segera berlayar menuju pantai terdekat", "Membuang sauh dan menunggu tsunami berlalu", "Bergerak menuju perairan yang lebih dalam", "Mengosongkan muatan kapal untuk mengurangi beban"], answer: "Bergerak menuju perairan yang lebih dalam" },
+            { question: "Berikut ini yang merupakan ciri-ciri planet Saturnus adalah...", options: ["Planet terpanas dengan permukaan berbatu", "Planet terbesar dengan bintik merah raksasa", "Planet bercincin indah yang tersusun dari es dan batuan", "Planet biru dengan atmosfer metana"], answer: "Planet bercincin indah yang tersusun dari es dan batuan" },
+            { question: "Lapisan atmosfer matahari bagian bawah yang berwarna kemerah-merahan berupa cincin cahaya dan tonjolan merah berupa awan disebut...", options: ["Fotosfer", "Korona", "Kromosfer", "Zona Radiatif"], answer: "Kromosfer" },
+            { question: "Fenomena alam berikut: 1. Pergantian siang dan malam. 2. Gerak semu harian benda langit. 3. Terjadinya perubahan musim. 4. Perbedaan lamanya siang dengan malam. 5. Perubahan rasi bintang yang tampak di langit. Fenomena alam yang disebabkan oleh revolusi bumi adalah nomor...", options: ["1 dan 2", "3 dan 4", "1, 2, dan 5", "3, 4, dan 5"], answer: "3, 4, dan 5" },
+            { question: "Peristiwa ledakan besar di atmosfer Matahari (flare) yang disertai pelepasan massa korona (CME) dapat berdampak pada Bumi, berupa...", options: ["Peningkatan suhu global secara drastis", "Perubahan orbit Bumi", "Gangguan sistem komunikasi, jaringan listrik, dan munculnya aurora", "Peningkatan aktivitas gunung berapi"], answer: "Gangguan sistem komunikasi, jaringan listrik, dan munculnya aurora" },
+            { question: "Berikut yang merupakan faktor-faktor yang mempengaruhi besar kecilnya aliran permukaan (run-off) dalam daur hidrologi adalah...", options: ["Suhu udara dan kecepatan angin", "Intensitas dan durasi hujan, infiltrasi tanah, dan topografi", "Kelembapan udara dan tekanan atmosfer", "Jenis awan dan ketinggiannya"], answer: "Intensitas dan durasi hujan, infiltrasi tanah, dan topografi" },
+            { question: "Fenomena yang terjadi ketika lempeng tektonik bertabrakan dan satu lempeng tektonik mendorong atau menyusup di bawah lempeng lainnya disebut...", options: ["Divergensi", "Transformasi", "Subduksi", "Konveksi mantel"], answer: "Subduksi" },
+            { question: "Lapisan di dalam inti bumi yang berupa cairan logam dan pergerakannya menghasilkan medan magnet Bumi adalah...", options: ["Inti dalam (inner core)", "Inti luar (outer core)", "Mantel bawah", "Kerak benua"], answer: "Inti luar (outer core)" },
+            // Ekonomi (10 soal)
+            { question: "Pak Agus adalah seorang penjual sembako yang membeli barang dari produsen dan menjualnya kepada konsumen. Pak Agus merupakan pelaku kegiatan ekonomi yang disebut...", options: ["Produsen", "Konsumen", "Distributor", "Investor"], answer: "Distributor" },
+            { question: "Seseorang memberikan bantuan sembako kepada korban bencana alam tanpa mengharapkan imbalan. Motif yang mendorong orang tersebut melakukannya adalah motif...", options: ["Ekonomi (mendapat keuntungan)", "Sosial (membantu sesama)", "Penghargaan (ingin dipuji)", "Kekuasaan (ingin dihormati)"], answer: "Sosial (membantu sesama)" },
+            { question: "Pak Eko dapat memilih mengkonsumsi bubur ayam atau lontong sayur sebagai menu sarapan pagi. Jika harga bubur ayam naik, Pak Eko mungkin memilih lontong sayur. Hal ini menunjukkan bubur ayam dan lontong sayur sebagai barang...", options: ["Komplementer", "Substitusi", "Inferior", " mewah"], answer: "Substitusi" },
+            { question: "Salah satu faktor utama penyebab kelangkaan sumber daya adalah...", options: ["Keinginan manusia yang tidak terbatas", "Keterbatasan jumlah alat pemuas kebutuhan dibandingkan kebutuhan manusia", "Kemajuan teknologi yang pesat", "Kebijakan pemerintah yang salah"], answer: "Keterbatasan jumlah alat pemuas kebutuhan dibandingkan kebutuhan manusia" },
+            { question: "Berikut ini yang termasuk contoh kebutuhan primer bagi seorang pelajar adalah...", options: ["Smartphone terbaru dan kuota internet", "Pakaian seragam sekolah, buku pelajaran, dan alat tulis", "Kendaraan pribadi untuk ke sekolah", "Uang jajan yang banyak"], answer: "Pakaian seragam sekolah, buku pelajaran, dan alat tulis" },
+            { question: "Pernyataan yang paling tepat tentang definisi kebutuhan adalah...", options: ["Segala sesuatu yang diinginkan manusia untuk mencapai kepuasan maksimal", "Barang dan jasa yang harus dipenuhi agar terlihat mapan secara sosial", "Sesuatu yang harus dipenuhi manusia untuk mempertahankan kelangsungan hidup secara layak", "Semua barang mewah yang dapat meningkatkan status sosial seseorang"], answer: "Sesuatu yang harus dipenuhi manusia untuk mempertahankan kelangsungan hidup secara layak" },
+            { question: "Barang yang didapatkan tanpa perlu melakukan pengorbanan atau mengeluarkan biaya untuk memperolehnya, seperti udara dan sinar matahari (dalam kondisi normal), disebut barang...", options: ["Ekonomi", "Substitusi", "Komplementer", "Bebas"], answer: "Bebas" },
+            { question: "Dalam diagram alir sirkuler (circular flow diagram) model tiga sektor, pelaku ekonomi yang TIDAK termasuk adalah...", options: ["Rumah Tangga Konsumen (RTK)", "Rumah Tangga Produsen (RTP)", "Pemerintah", "Masyarakat Luar Negeri"], answer: "Masyarakat Luar Negeri" },
+            { question: "Berikut ini yang merupakan peran utama rumah tangga produsen (RTP) dalam kegiatan ekonomi adalah...", options: ["Mengkonsumsi barang dan jasa untuk memenuhi kebutuhan", "Menyediakan faktor-faktor produksi seperti tenaga kerja dan modal", "Menghasilkan barang dan jasa serta membayar pajak kepada pemerintah", "Mengatur dan mengawasi jalannya kegiatan ekonomi"], answer: "Menghasilkan barang dan jasa serta membayar pajak kepada pemerintah" },
+            { question: "Pada awal tahun 2020, Indonesia dilanda berbagai bencana yang menyebabkan kelangkaan alat pemuas kebutuhan. Upaya yang dapat dilakukan pemerintah dan masyarakat untuk mengatasi kelangkaan tersebut di antaranya adalah...", options: ["Melakukan impor besar-besaran tanpa batas", "Membatasi konsumsi masyarakat secara paksa", "Menjaga stabilitas harga, memberikan edukasi, dan mengembangkan teknologi alternatif", "Menimbun barang untuk dijual saat harga tinggi"], answer: "Menjaga stabilitas harga, memberikan edukasi, dan mengembangkan teknologi alternatif" }
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let questions = [];
+        let myChart;
+
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultsScreen = document.getElementById('results-screen');
+        
+        const startQuizBtn = document.getElementById('start-quiz-btn');
+        const nextQuestionBtn = document.getElementById('next-question-btn');
+        const restartQuizBtn = document.getElementById('restart-quiz-btn');
+        
+        const quizCategoryTitle = document.getElementById('quiz-category-title');
+        const questionCounter = document.getElementById('question-counter');
+        const progressBar = document.getElementById('progress-bar');
+        const questionText = document.getElementById('question-text');
+        const answerOptions = document.getElementById('answer-options');
+        const feedbackText = document.getElementById('feedback-text');
+        const correctAnswerText = document.getElementById('correct-answer-text');
+
+        startQuizBtn.addEventListener('click', startQuiz);
+        nextQuestionBtn.addEventListener('click', loadNextQuestion);
+        restartQuizBtn.addEventListener('click', startQuiz);
+        
+        function startQuiz() {
+            currentQuestionIndex = 0;
+            score = 0;
+            questions = [...allQuestions].sort(() => 0.5 - Math.random()); // Shuffle questions
+            
+            welcomeScreen.classList.add('hidden');
+            resultsScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            resetState();
+            const currentQuestion = questions[currentQuestionIndex];
+            
+            questionText.textContent = `${currentQuestionIndex + 1}. ${currentQuestion.question}`;
+            questionCounter.textContent = `Soal ${currentQuestionIndex + 1} dari ${questions.length}`;
+            progressBar.style.width = `${((currentQuestionIndex + 1) / questions.length) * 100}%`;
+
+            currentQuestion.options.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.classList.add('option-btn', 'w-full', 'p-4', 'text-left', 'bg-white', 'border', 'border-gray-300', 'rounded-lg', 'hover:bg-gray-100', 'hover:border-teal-500', 'transition-colors', 'duration-200');
+                button.onclick = () => checkAnswer(option, button);
+                answerOptions.appendChild(button);
+            });
+        }
+        
+        function checkAnswer(userAnswer, buttonElement) {
+            const currentQuestion = questions[currentQuestionIndex];
+            const isCorrect = userAnswer.trim().toLowerCase() === currentQuestion.answer.toLowerCase();
+
+            if (isCorrect) {
+                score++;
+                feedbackText.textContent = "Benar!";
+                feedbackText.className = 'feedback-correct text-xl font-bold text-center';
+                buttonElement.classList.add('correct');
+            } else {
+                feedbackText.textContent = "Salah!";
+                feedbackText.className = 'feedback-incorrect text-xl font-bold text-center';
+                correctAnswerText.textContent = `Jawaban yang benar: ${currentQuestion.answer}`;
+                buttonElement.classList.add('incorrect');
+            }
+            
+            const allOptionButtons = answerOptions.querySelectorAll('button');
+            allOptionButtons.forEach(btn => btn.disabled = true);
+            
+            nextQuestionBtn.classList.remove('hidden');
+        }
+
+        function resetState() {
+            answerOptions.innerHTML = '';
+            feedbackText.textContent = '';
+            correctAnswerText.textContent = '';
+            nextQuestionBtn.classList.add('hidden');
+        }
+
+        function loadNextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < questions.length) {
+                loadQuestion();
+            } else {
+                showResults();
+            }
+        }
+        
+        function showResults() {
+            quizScreen.classList.add('hidden');
+            resultsScreen.classList.remove('hidden');
+            
+            const percentage = (score / questions.length) * 100;
+            document.getElementById('score-text').textContent = `Skor Anda: ${score} dari ${questions.length} (${percentage.toFixed(1)}%)`;
+            
+            const ctx = document.getElementById('results-chart').getContext('2d');
+            if(myChart) {
+                myChart.destroy();
+            }
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Benar', 'Salah'],
+                    datasets: [{
+                        data: [score, questions.length - score],
+                        backgroundColor: ['#10B981', '#EF4444'],
+                        borderColor: ['#ffffff'],
+                        borderWidth: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            enabled: true
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
