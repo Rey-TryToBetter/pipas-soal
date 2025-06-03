@@ -8,8 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Warm Neutral with Teal Accent -->
-    <!-- Application Structure Plan: The application is structured as an interactive quiz. User flow: 1. Welcome Screen: User starts the combined quiz. 2. Quiz Screen: Displays one multiple-choice question at a time, provides immediate feedback, and shows a progress bar. Includes a Gemini-powered "Explain Further" button for incorrect answers. 3. Results Screen: After the quiz, a summary screen shows the score with a doughnut chart. Includes a Gemini-powered "Generate Similar Questions" button. This structure is chosen for engaging, focused learning. -->
-    <!-- Visualization & Content Choices: Report Info: Static Q&A list (now combined). -> Goal: Create a unified interactive self-assessment tool with AI explanations and question generation. -> Viz/Presentation Method: One-question-at-a-time multiple-choice quiz. Gemini for explanations and new questions. Results via Chart.js doughnut chart. -> Interaction: Users click buttons. Immediate feedback. Buttons trigger Gemini API calls. -> Justification: Interactive format with AI-powered feedback and content generation enhances learning. -> Library/Method: Vanilla JS, Tailwind CSS, Chart.js, Gemini API. -->
+    <!-- Application Structure Plan: The application is structured as an interactive quiz. User flow: 1. Welcome Screen: User starts the combined quiz. 2. Quiz Screen: Displays one multiple-choice question at a time, provides immediate feedback, and shows a progress bar. Includes a Gemini-powered "Ask for Hint" button before answering and an "Explain Further" button for incorrect answers. 3. Results Screen: After the quiz, a summary screen shows the score with a doughnut chart. Includes a Gemini-powered "Generate Similar Questions" button. This structure is chosen for engaging, focused learning. -->
+    <!-- Visualization & Content Choices: Report Info: Static Q&A list (now combined). -> Goal: Create a unified interactive self-assessment tool with AI hints, explanations, and question generation. -> Viz/Presentation Method: One-question-at-a-time multiple-choice quiz. Gemini for hints, explanations, and new questions. Results via Chart.js doughnut chart. -> Interaction: Users click buttons. Immediate feedback. Buttons trigger Gemini API calls. -> Justification: Interactive format with AI-powered assistance enhances learning. -> Library/Method: Vanilla JS, Tailwind CSS, Chart.js, Gemini API. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -29,6 +29,10 @@
         .gemini-btn:hover {
             background-color: #7C3AED; /* Violet 600 */
         }
+        .gemini-btn:disabled {
+            background-color: #A78BFA; /* Violet 300 */
+            cursor: not-allowed;
+        }
         #loading-indicator svg {
             animation: spin 1s linear infinite;
         }
@@ -44,7 +48,7 @@
         
         <div id="welcome-screen" class="bg-white p-8 rounded-xl shadow-lg text-center">
             <h1 class="text-3xl font-bold text-teal-800 mb-2">Selamat Datang di Kuis Interaktif ✨</h1>
-            <p class="text-gray-600 mb-6">Uji pengetahuan umum Anda dengan bantuan AI! Aplikasi ini menyajikan 40 soal pilihan ganda, dengan fitur penjelasan dan pembuatan soal baru oleh Gemini.</p>
+            <p class="text-gray-600 mb-6">Uji pengetahuan umum Anda dengan bantuan AI! Aplikasi ini menyajikan 40 soal pilihan ganda, dengan fitur petunjuk, penjelasan, dan pembuatan soal baru oleh Gemini.</p>
             <div class="flex justify-center">
                 <button id="start-quiz-btn" class="bg-teal-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-teal-700 transition-colors duration-300 w-full sm:w-auto">Mulai Kuis (40 Soal)</button>
             </div>
@@ -61,9 +65,14 @@
                 </div>
             </div>
             
-            <div id="question-container" class="mb-6">
+            <div id="question-container" class="mb-4">
                 <p id="question-text" class="text-lg text-gray-700 leading-relaxed"></p>
             </div>
+
+            <div class="mb-4 text-center">
+                <button id="request-hint-btn" class="gemini-btn font-semibold py-2 px-4 rounded-lg text-sm">Minta Petunjuk ✨</button>
+            </div>
+            <div id="hint-content" class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-gray-700 hidden whitespace-pre-wrap"></div>
             
             <div id="answer-options" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
 
@@ -179,6 +188,7 @@
         const restartQuizBtn = document.getElementById('restart-quiz-btn');
         const explainFurtherBtn = document.getElementById('explain-further-btn');
         const generateSimilarBtn = document.getElementById('generate-similar-btn');
+        const requestHintBtn = document.getElementById('request-hint-btn');
         
         const quizCategoryTitle = document.getElementById('quiz-category-title');
         const questionCounter = document.getElementById('question-counter');
@@ -188,6 +198,7 @@
         const feedbackText = document.getElementById('feedback-text');
         const correctAnswerText = document.getElementById('correct-answer-text');
         const explanationContent = document.getElementById('explanation-content');
+        const hintContent = document.getElementById('hint-content');
         const similarQuestionsContainer = document.getElementById('similar-questions-container');
         const similarQuestionsContent = document.getElementById('similar-questions-content');
         const loadingIndicator = document.getElementById('loading-indicator');
@@ -197,6 +208,7 @@
         restartQuizBtn.addEventListener('click', startQuiz);
         explainFurtherBtn.addEventListener('click', handleExplainFurther);
         generateSimilarBtn.addEventListener('click', handleGenerateSimilar);
+        requestHintBtn.addEventListener('click', handleRequestHint);
         
         function showLoadingIndicator() {
             loadingIndicator.classList.remove('hidden');
@@ -236,6 +248,20 @@
             }
         }
 
+        async function handleRequestHint() {
+            const currentQuestion = questions[currentQuestionIndex];
+            const prompt = `Anda adalah seorang asisten kuis yang membantu. Untuk pertanyaan berikut: "${currentQuestion.question}", berikan satu petunjuk singkat (1-2 kalimat) yang dapat membantu pengguna menemukan jawaban yang benar, tanpa mengungkapkan jawabannya secara langsung. Petunjuk harus dalam Bahasa Indonesia.`;
+            
+            const payload = { contents: [{ parts: [{ text: prompt }] }] };
+            hintContent.textContent = "Meminta petunjuk dari AI...";
+            hintContent.classList.remove('hidden');
+            requestHintBtn.disabled = true;
+            
+            const hint = await callGeminiAPI(payload);
+            hintContent.textContent = `Petunjuk: ${hint}`;
+        }
+
+
         async function handleExplainFurther() {
             const currentQuestion = questions[currentQuestionIndex];
             const prompt = `Anda adalah seorang tutor ahli. Pertanyaan kuisnya adalah: "${currentQuestion.question}". Pengguna menjawab: "${lastUserAnswer}". Jawaban yang benar adalah: "${currentQuestion.answer}". Tolong jelaskan dengan singkat dan jelas mengapa jawaban tersebut benar dan konsep dasar di baliknya. Jika pengguna salah, jelaskan juga mengapa jawaban pengguna salah. Gunakan bahasa Indonesia yang baik dan mudah dimengerti.`;
@@ -254,9 +280,8 @@
 
             let sampleQuestionsForPrompt = [];
             if (incorrectAnswerDetails.length > 0) {
-                sampleQuestionsForPrompt = incorrectAnswerDetails.slice(0, 2); // Ambil maks 2 soal salah
+                sampleQuestionsForPrompt = incorrectAnswerDetails.slice(0, 2); 
             } else {
-                // Ambil 2 soal acak jika tidak ada yang salah
                 const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
                 sampleQuestionsForPrompt = shuffled.slice(0, 2).map(q => ({ question: q.question, answer: q.answer, options: q.options }));
             }
@@ -302,7 +327,7 @@ Format respons HARUS berupa JSON array dari objek, di mana setiap objek memiliki
             
             try {
                 const newQuestions = JSON.parse(resultText);
-                if (Array.isArray(newQuestions) && newQuestions.length > 0) {
+                if (Array.isArray(newQuestions) && newQuestions.length > 0 && newQuestions.every(q => q.question && q.options && q.answer && q.options.length === 4)) {
                     similarQuestionsContent.innerHTML = newQuestions.map((q, index) => `
                         <div class="mb-4 p-3 bg-white rounded-md shadow">
                             <p class="font-semibold text-gray-700">${index + 1}. ${q.question}</p>
@@ -316,7 +341,7 @@ Format respons HARUS berupa JSON array dari objek, di mana setiap objek memiliki
                     console.error("Parsed new questions are not as expected:", newQuestions);
                 }
             } catch (e) {
-                similarQuestionsContent.innerHTML = `<p class="text-center text-red-600">Gagal mem-parsing soal baru dari AI. Error: ${e.message}</p><p class="text-xs text-gray-500 mt-2">Respons mentah: ${resultText}</p>`;
+                similarQuestionsContent.innerHTML = `<p class="text-center text-red-600">Gagal mem-parsing soal baru dari AI. Error: ${e.message}</p><p class="text-xs text-gray-500 mt-2">Respons mentah (sebagian): ${resultText.substring(0, 200)}...</p>`;
                 console.error("Error parsing similar questions JSON:", e, "Raw response:", resultText);
             }
         }
@@ -344,6 +369,9 @@ Format respons HARUS berupa JSON array dari objek, di mana setiap objek memiliki
             questionText.textContent = `${currentQuestionIndex + 1}. ${currentQuestion.question}`;
             questionCounter.textContent = `Soal ${currentQuestionIndex + 1} dari ${questions.length}`;
             progressBar.style.width = `${((currentQuestionIndex + 1) / questions.length) * 100}%`;
+            requestHintBtn.classList.remove('hidden');
+            requestHintBtn.disabled = false;
+
 
             currentQuestion.options.forEach(option => {
                 const button = document.createElement('button');
@@ -358,6 +386,8 @@ Format respons HARUS berupa JSON array dari objek, di mana setiap objek memiliki
             lastUserAnswer = userAnswer;
             const currentQuestion = questions[currentQuestionIndex];
             const isCorrect = userAnswer.trim().toLowerCase() === currentQuestion.answer.toLowerCase();
+
+            requestHintBtn.classList.add('hidden'); // Sembunyikan tombol petunjuk setelah menjawab
 
             if (isCorrect) {
                 score++;
@@ -391,7 +421,10 @@ Format respons HARUS berupa JSON array dari objek, di mana setiap objek memiliki
             correctAnswerText.textContent = '';
             explanationContent.classList.add('hidden');
             explanationContent.textContent = '';
+            hintContent.classList.add('hidden');
+            hintContent.textContent = '';
             explainFurtherBtn.classList.add('hidden');
+            requestHintBtn.classList.add('hidden'); // Pastikan disembunyikan saat reset
             nextQuestionBtn.classList.add('hidden');
         }
 
